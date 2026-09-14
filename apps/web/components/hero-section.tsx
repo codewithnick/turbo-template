@@ -1,88 +1,184 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { stats } from "@/lib/site-data";
+import { CtaLink } from "@/components/cta";
+import { HeroParallax } from "@/components/hero-parallax";
+import { hero } from "@/lib/site-data";
 import { ANALYTICS_EVENTS, trackClarityEvent, trackEvent } from "@/lib/analytics";
+
+const ROTATE_MS = 4200;
+const FADE_S = 0.5;
+const hookWords = hero.hook.split(" ");
+
+/**
+ * Cycles the supporting line under the headline. Each line clears out before
+ * the next arrives, so the two never ghost over each other. Holds on the first
+ * line when reduced motion is requested.
+ */
+function RotatingLine() {
+  const reduced = useReducedMotion();
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (reduced || hero.rotating.length < 2) return;
+    const id = window.setInterval(
+      () => setIndex((current) => (current + 1) % hero.rotating.length),
+      ROTATE_MS,
+    );
+    return () => window.clearInterval(id);
+  }, [reduced]);
+
+  return (
+    <p
+      className="relative mt-8 h-16 max-w-2xl text-lg leading-relaxed font-light text-white/85 sm:h-10 sm:text-xl"
+      aria-live="polite"
+    >
+      {hero.rotating.map((line, lineIndex) => {
+        const active = lineIndex === index;
+        return (
+          <motion.span
+            key={line}
+            className="absolute inset-x-0 top-0"
+            initial={false}
+            animate={{ opacity: active ? 1 : 0, y: active ? 0 : 8 }}
+            transition={{
+              duration: reduced ? 0 : FADE_S,
+              delay: reduced || !active ? 0 : FADE_S,
+              ease: "easeOut",
+            }}
+            aria-hidden={!active}
+          >
+            {line}
+          </motion.span>
+        );
+      })}
+    </p>
+  );
+}
 
 export function HeroSection() {
   const reduced = useReducedMotion();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // No opacity in initial — hero text must be visible immediately for LCP.
-  // Only animate the y-offset so the h1 is painted on first render.
-  const fadeUp = reduced
-    ? {}
-    : { initial: { y: 18 }, animate: { y: 0 }, transition: { duration: 0.5, ease: "easeOut" as const } };
-
-  const fadeScale = reduced
-    ? {}
-    : { initial: { opacity: 0, scale: 0.96 }, animate: { opacity: 1, scale: 1 }, transition: { duration: 0.5, delay: 0.1 } };
+  // Autoplay can be blocked (data saver, low power mode). The poster stays
+  // visible in that case, so there is nothing to recover from.
+  useEffect(() => {
+    if (reduced) {
+      videoRef.current?.pause();
+      return;
+    }
+    videoRef.current?.play().catch(() => {});
+  }, [reduced]);
 
   return (
-    <section className="relative overflow-hidden px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.18),transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.16),transparent_24%)]" />
-      <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <motion.div {...fadeUp}>
-          <Badge className="mb-4 gap-2">
-            <Sparkles className="size-3.5" aria-hidden="true" />
-            Client-ready starter template
-          </Badge>
-          <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl dark:text-white">
-            Ship beautiful client websites in days, not weeks.
-          </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 sm:text-lg dark:text-slate-300">
-            A premium monorepo starter with Next.js, Express, cron automation, Tailwind v4, and a polished marketing UI ready for fast swaps.
-          </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/contact"
-              className="w-full sm:w-auto"
-              onClick={() => {
-                trackEvent(ANALYTICS_EVENTS.HERO_CTA_CLICKED, { button: "primary", href: "/contact" });
-                trackClarityEvent(ANALYTICS_EVENTS.HERO_CTA_CLICKED);
-              }}
-            >
-              <Button size="lg" className="w-full">
-                Launch your next site
-                <ArrowRight className="ml-2 size-4" aria-hidden="true" />
-              </Button>
-            </Link>
-            <Link
-              href="/portfolio"
-              className="w-full sm:w-auto"
-              onClick={() => trackEvent(ANALYTICS_EVENTS.HERO_CTA_CLICKED, { button: "secondary", href: "/portfolio" })}
-            >
-              <Button variant="secondary" size="lg" className="w-full">Browse examples</Button>
-            </Link>
-          </div>
-        </motion.div>
-
-        <motion.div
-          {...fadeScale}
-          className="rounded-[2rem] border border-white/60 bg-white/80 p-4 shadow-2xl shadow-indigo-500/10 backdrop-blur dark:border-slate-800 dark:bg-slate-950/70"
+    <section className="on-dark relative isolate flex min-h-[100svh] items-end overflow-hidden bg-[var(--navy-deep)]">
+      {/* The video layer drifts and fades as the page scrolls, so the copy
+          leaves ahead of the picture instead of the whole fold sliding away
+          as one piece. */}
+      <HeroParallax>
+        <video
+          ref={videoRef}
+          className="size-full object-cover"
+          poster="/hero/hero-poster.jpg"
+          width={1600}
+          height={900}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+          tabIndex={-1}
         >
-          <div className="rounded-[1.5rem] bg-slate-950 p-5 text-white">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {stats.map((stat) => (
-                <div key={stat.label} className="rounded-2xl bg-white/5 p-4">
-                  <p className="text-2xl font-semibold">{stat.value}</p>
-                  <p className="mt-1 text-sm text-slate-300">{stat.label}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-cyan-400 p-[1px]">
-              <div className="rounded-2xl bg-slate-950 p-4 text-sm text-slate-300">
-                <p className="font-medium text-white">Why clients love it</p>
-                <p className="mt-2">Fast page speed, premium design, and easy content swaps for each new launch.</p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
+          <source src="/hero/hero.mp4" type="video/mp4" />
+        </video>
+      </HeroParallax>
+
+      {/* Scrim follows the copy: heaviest at the bottom-left where the type
+          sits, lifting toward the top-right so the skyline stays visible.
+          The footage is the skyline half only (night → sunset, mirrored),
+          graded with a high-contrast S-curve at 45% strength and saturation
+          1.26, played 1.5x slower. Measured over the brightest lit-window
+          pixels under the copy across the loop: headline 4.44–6.26:1,
+          subline 7.87–10.72:1. Re-measure before lightening any stop. */}
+      <div
+        className="absolute inset-0 -z-10 bg-[linear-gradient(to_top,rgba(8,23,44,0.84)_0%,rgba(8,23,44,0.66)_45%,rgba(8,23,44,0.28)_100%)]"
+        aria-hidden="true"
+      />
+      <div
+        className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(8,23,44,0.58)_0%,rgba(8,23,44,0.20)_52%,transparent_80%)]"
+        aria-hidden="true"
+      />
+
+      <div className="mx-auto w-full max-w-6xl px-4 pt-32 pb-20 sm:px-6 lg:px-8 lg:pb-28">
+        {/* One h1 per page. Sized to dominate the fold — this industry's better
+            sites lead with type at this weight, not with chrome. */}
+        <h1 className="hero-rise-slow font-display max-w-5xl text-[clamp(2.75rem,8.5vw,6.5rem)] leading-[0.98] font-bold tracking-[-0.035em] text-white">
+          {hookWords.length > 1 ? `${hookWords.slice(0, -1).join(" ")} ` : ""}
+          {/* The mark stays in inline flow and rides the last word: absolute
+              positioning put it wherever the line happened to break. */}
+          <span className="whitespace-nowrap">
+            {hookWords.at(-1)}
+            {hero.trademark ? (
+              <sup
+                aria-label="trademark"
+                className="ml-[0.06em] align-super text-[0.2em] font-normal tracking-normal text-white/45"
+              >
+                &trade;
+              </sup>
+            ) : null}
+          </span>
+        </h1>
+
+        <div className="hero-rise-delay-1">
+          <RotatingLine />
+        </div>
+
+        {/* Both doors, left-aligned under the subhead. The two-audience split
+            is the business model, so neither CTA is demoted to a text link. */}
+        <div className="hero-rise-delay-2 mt-12 flex flex-col gap-3 sm:flex-row">
+          <CtaLink
+            href={hero.primaryCta.href}
+            label={hero.primaryCta.label}
+            variant="primary"
+            size="lg"
+            withArrow
+            onClick={() => {
+              trackEvent(ANALYTICS_EVENTS.HERO_CTA_CLICKED, {
+                button: "primary",
+                href: hero.primaryCta.href,
+              });
+              trackClarityEvent(ANALYTICS_EVENTS.HERO_CTA_CLICKED);
+            }}
+          />
+          <CtaLink
+            href={hero.secondaryCta.href}
+            label={hero.secondaryCta.label}
+            variant="outline"
+            size="lg"
+            onClick={() =>
+              trackEvent(ANALYTICS_EVENTS.HERO_CTA_CLICKED, {
+                button: "secondary",
+                href: hero.secondaryCta.href,
+              })
+            }
+          />
+        </div>
       </div>
+
+      {/* Scroll cue — the only other thing competing for attention. Desktop
+          only; on a phone the fold ends where the thumb already is. */}
+      <motion.a
+        href="#what-we-do"
+        aria-label="Scroll to what we do"
+        className="absolute right-6 bottom-10 hidden text-white/40 transition-colors hover:text-white lg:right-10 lg:block"
+        animate={reduced ? {} : { y: [0, 8, 0] }}
+        transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <span className="block h-12 w-px bg-gradient-to-b from-transparent via-white/40 to-white/70" />
+      </motion.a>
     </section>
   );
 }

@@ -4,31 +4,115 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --muted: #475569;
-  --muted-bg: #f1f5f9;
-  --card: rgba(255, 255, 255, 0.9);
-  --border: #e2e8f0;
-  --primary: #4f46e5;
+  --background: #ffffff;
+  --foreground: #0b1b33;
+  --muted: #4a5b73;
+  --muted-bg: #f2f5f9;
+  --card: rgba(255, 255, 255, 0.95);
+  --border: #dde4ed;
+  --primary: #0e2a4f;
   --primary-foreground: #ffffff;
+  --accent: #d8261c;
+  --accent-hover: #b81f16;
+  --accent-foreground: #ffffff;
+  --header-height: 4.5rem;
+
+  /* Navy is the heading colour on light surfaces and the ground colour on the
+     dark bands. Named separately from --primary because --primary shifts to a
+     legible mid-blue in dark mode while these two must stay dark. */
+  --navy: #0e2a4f;
+  --navy-deep: #08172c;
+
+  /* Red used as SMALL TEXT rather than as a fill. #d8261c measures 4.98:1 on
+     white and 4.56:1 on --muted-bg, so the brand red clears AA for text here
+     and both tokens hold the same value. Dark mode splits them apart. */
+  --accent-text: #d8261c;
 }
 
 .dark {
-  --background: #020617;
-  --foreground: #f8fafc;
-  --muted: #cbd5e1;
-  --muted-bg: #0f172a;
-  --card: rgba(15, 23, 42, 0.85);
-  --border: #1e293b;
-  --primary: #6366f1;
+  --background: #071527;
+  --foreground: #f4f7fb;
+  --muted: #9fb1c8;
+  --muted-bg: #0d2340;
+  --card: rgba(10, 31, 60, 0.9);
+  --border: #163258;
+  --primary: #3f7fd0;
   --primary-foreground: #ffffff;
+  --accent: #d8261c;
+  --accent-hover: #b81a12;
+  --accent-foreground: #ffffff;
+  --navy: #0e2a4f;
+  --navy-deep: #08172c;
+
+  /* Two reds because the same hue cannot serve as both a fill and small text.
+     --accent is a FILL carrying white labels, so the constraint is the label:
+     #ef4438 measured only 3.78:1 against white, which fails AA for the 11px
+     uppercase button text, so the fill matches light mode's #d8261c (4.98:1
+     against white). --accent-text is the red used AS text on dark surfaces,
+     where the constraint is the surface behind it. It has to clear AA on the
+     page-hero's navy too, not just the panel surfaces: #f4564a measured only
+     4.29:1 on --navy, so the 11px eyebrow labels there failed. #f76b60 is the
+     nearest red to the brand that clears 4.5:1 on ALL FOUR dark grounds
+     (4.94:1 on --navy, 5.43:1 on --muted-bg, 6.18:1 on --navy-deep,
+     6.31:1 on --background). */
+  --accent-text: #f76b60;
+}
+
+/* Spacing rhythm. Sections come in three weights so the page reads as verses
+   rather than one repeated interval — tight for stat strips, standard for most
+   content, loose for the full-bleed image bands. 8pt grid throughout. */
+@theme inline {
+  --font-display: var(--font-display-sans), "Archivo", system-ui, sans-serif;
+  --font-body: var(--font-body-sans), "Inter", system-ui, sans-serif;
+
+  --spacing-section-tight: 4rem;
+  --spacing-section: 6rem;
+  --spacing-section-loose: 8rem;
+}
+
+/* Motion tokens. One easing curve for everything that enters and a shorter one
+   for state changes, so hovers read as the same system as the scroll reveals.
+   Durations follow the 150-300ms micro / 300-500ms reveal split. */
+:root {
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-micro: 180ms;
+  --duration-reveal: 700ms;
+}
+
+/* The header is fixed. The home hero paints under it on purpose (see
+   hero-section.tsx); every other page gets the height back via this class,
+   applied by SiteShell so content is never hidden behind the bar. */
+.page-offset {
+  padding-top: var(--header-height);
+}
+
+/* Figures in stat blocks should line up in columns. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Section eyebrow — the small red uppercase label that heads a section. Used
+   on every route, so it lives here rather than being re-typed per page. */
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-text);
 }
 
 /* Visible focus indicators (WCAG 2.4.11) */
 :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* On the navy bands the red ring disappears into the ground — switch to white
+   so the focus indicator is visible wherever it lands. */
+.on-dark :focus-visible {
+  outline-color: #ffffff;
 }
 
 /* Respect reduced motion (WCAG 2.3.3) */
@@ -48,16 +132,59 @@
   }
 }
 
+html {
+  scroll-padding-top: var(--header-height);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
 }
 
 ::selection {
-  background: rgba(99, 102, 241, 0.25);
+  background: rgba(216, 38, 28, 0.22);
 }
 
 .prose a {
-  color: #4f46e5;
+  color: #0e2a4f;
   text-decoration: underline;
+}
+
+.dark .prose a {
+  color: #7fb0ec;
+}
+
+/* Hero entrance. CSS rather than JS so the headline and CTAs are painted by
+   the first frame — a delayed opacity fade would hide the primary CTA. The
+   three steps stagger headline, subhead, then CTAs; the last one still lands
+   inside the first second. */
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hero-rise-slow {
+  animation: hero-rise 0.9s var(--ease-out-quint) both;
+}
+
+.hero-rise-delay-1 {
+  animation: hero-rise 0.8s var(--ease-out-quint) 0.18s both;
+}
+
+.hero-rise-delay-2 {
+  animation: hero-rise 0.8s var(--ease-out-quint) 0.34s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-rise-slow,
+  .hero-rise-delay-1,
+  .hero-rise-delay-2 {
+    animation: none;
+  }
 }

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Archivo, Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { generateTokens } from "@repo/ui";
 
 import { SiteFooter } from "@/components/site-footer";
+import { ScrollProgress } from "@/components/scroll-progress";
 import { SiteHeader } from "@/components/site-header";
+import { SiteShell } from "@/components/site-shell";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ChatbotLoader } from "@/components/chatbot-loader";
 import { ConsentProvider } from "@/components/consent-provider";
@@ -12,13 +14,26 @@ import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 import { AnalyticsScripts } from "@/components/analytics-scripts";
 import { siteConfig } from "@/lib/site-data";
 
-const inter = Inter({ subsets: ["latin"], display: "swap" });
+const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-body-sans" });
+
+// Archivo carries the display type. Its wider cuts give the headline and the
+// stat numbers an engineered look that Inter's even widths do not.
+const archivo = Archivo({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["500", "600", "700"],
+  variable: "--font-display-sans",
+});
 import brand from "../../../brand.config";
 
 import "./globals.css";
 
 const brandCss = generateTokens(brand);
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? siteConfig.url;
+// Uses the resolved value from site-data rather than re-reading the env var:
+// `??` let a defined-but-empty NEXT_PUBLIC_SITE_URL through as "", and
+// `new URL("")` below threw ERR_INVALID_URL at module scope, failing the build
+// during page-data collection.
+const siteUrl = siteConfig.url;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -66,7 +81,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <style dangerouslySetInnerHTML={{ __html: brandCss }} />
       </head>
-      <body className={`${inter.className} min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50`}>
+      <body className={`${inter.variable} ${archivo.variable} ${inter.className} min-h-screen antialiased`}>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
@@ -81,7 +96,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </a>
             <div className="relative flex min-h-screen flex-col">
               <SiteHeader />
-              <main id="main-content" className="flex-1">{children}</main>
+              <ScrollProgress />
+              <SiteShell>{children}</SiteShell>
               <SiteFooter />
             </div>
             <ChatbotLoader />

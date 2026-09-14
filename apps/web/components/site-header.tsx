@@ -1,54 +1,111 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, Search, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { CtaLink } from "@/components/cta";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Button } from "@/components/ui/button";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics";
-import { siteConfig } from "@/lib/site-data";
+import { WordmarkSignature } from "@/components/wordmark-signature";
+import { headerCta, hero, siteConfig } from "@/lib/site-data";
 import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const pathname = usePathname();
   const mobileNavId = "mobile-nav";
 
+  // The home hero is a full-bleed video, so the header floats over it until
+  // the user scrolls past the fold. Every other page gets the solid bar.
+  const overlay = pathname === "/" && !scrolled && !open;
+
+  useEffect(() => {
+    if (pathname !== "/") {
+      setScrolled(true);
+      return;
+    }
+
+    const onScroll = () => setScrolled(window.scrollY > 80);
+    onScroll();
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    document.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("scroll", onScroll, { capture: true });
+    };
+  }, [pathname]);
+
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/75">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-3 font-semibold tracking-tight" aria-label={`${siteConfig.name} — home`}>
-          <span aria-hidden="true" className="flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-cyan-400 text-white shadow-lg shadow-indigo-500/30">
-            {siteConfig.name.charAt(0).toUpperCase()}
-          </span>
-          <span>{siteConfig.name}</span>
+    <header
+      className={cn(
+        "fixed top-0 z-50 w-full transition-colors duration-300",
+        overlay
+          ? "border-b border-white/10 bg-transparent"
+          // Literal colours on purpose: an opacity modifier on a CSS-variable
+          // colour computed to ~3% alpha here, leaving nav text floating on
+          // the page in light mode.
+          : "border-b border-[var(--border)] bg-white/90 backdrop-blur-xl dark:bg-[#071527]/90",
+      )}
+    >
+      <div className="mx-auto flex h-[var(--header-height)] max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        {/* The wordmark draws itself once, then quietly cross-fades to the
+            real type — see components/wordmark-signature.tsx. This is the only
+            place on the site that plays it: the header lives in the root
+            layout, so it does not re-mount on client navigation and the
+            animation runs once per full page load rather than on every route
+            change. The footer stays plain type. */}
+        <Link href="/" aria-label={`${siteConfig.name} — home`} className="shrink-0">
+          <WordmarkSignature onDark={overlay} />
         </Link>
 
-        <nav aria-label="Main navigation" className="hidden items-center gap-1 md:flex">
+        <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
           {siteConfig.nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="rounded-full px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
-              onClick={() => trackEvent(ANALYTICS_EVENTS.NAV_LINK_CLICKED, { href: item.href, label: item.label, source: "desktop" })}
+              className={cn(
+                "px-3 py-2 text-[0.7rem] font-semibold tracking-[0.1em] uppercase transition-colors duration-[var(--duration-micro)]",
+                overlay
+                  ? "text-white/80 hover:bg-white/10 hover:text-white"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-[var(--navy)] dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white",
+              )}
+              onClick={() =>
+                trackEvent(ANALYTICS_EVENTS.NAV_LINK_CLICKED, {
+                  href: item.href,
+                  label: item.label,
+                  source: "desktop",
+                })
+              }
             >
               {item.label}
             </Link>
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 md:flex">
-          <Link href="/search" aria-label="Search" className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white transition">
-            <Search size={16} aria-hidden="true" />
-          </Link>
-          <ThemeToggle />
-          <Link href="/contact">
-            <Button size="sm">Start a project</Button>
-          </Link>
+        <div className="hidden items-center gap-3 lg:flex">
+          <CtaLink
+            href={headerCta.primary.href}
+            label={headerCta.primary.label}
+            variant="primary"
+            className="px-5 py-2.5 text-[0.7rem] tracking-[0.1em] uppercase"
+          />
+          <CtaLink
+            href={headerCta.secondary.href}
+            label={headerCta.secondary.label}
+            variant={overlay ? "outline" : "outlineDark"}
+            className="px-5 py-2.5 text-[0.7rem] tracking-[0.1em] uppercase"
+          />
         </div>
 
         <button
-          className="rounded-full border border-slate-200 p-2 md:hidden dark:border-slate-800"
+          className={cn(
+            "rounded-sm border p-2 lg:hidden",
+            overlay ? "border-white/30 text-white" : "border-slate-200 dark:border-slate-800",
+          )}
           aria-label={open ? "Close navigation menu" : "Open navigation menu"}
           aria-expanded={open}
           aria-controls={mobileNavId}
@@ -60,35 +117,55 @@ export function SiteHeader() {
 
       <div
         id={mobileNavId}
-        className={cn("border-t border-slate-200 md:hidden dark:border-slate-800", open ? "block" : "hidden")}
+        className={cn(
+          "border-t border-slate-200 bg-white lg:hidden dark:border-slate-800 dark:bg-slate-950",
+          open ? "block" : "hidden",
+        )}
       >
         <nav aria-label="Mobile navigation">
-          <div className="space-y-2 px-4 py-4">
+          <div className="space-y-1 px-4 py-4">
             {siteConfig.nav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => {
                   setOpen(false);
-                  trackEvent(ANALYTICS_EVENTS.NAV_LINK_CLICKED, { href: item.href, label: item.label, source: "mobile" });
+                  trackEvent(ANALYTICS_EVENTS.NAV_LINK_CLICKED, {
+                    href: item.href,
+                    label: item.label,
+                    source: "mobile",
+                  });
                 }}
-                className="block rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900"
+                className="block rounded-sm px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900"
               >
                 {item.label}
               </Link>
             ))}
-            <Link
-              href="/search"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900"
-            >
-              <Search size={14} aria-hidden="true" />
-              Search
-            </Link>
-            <div className="flex items-center justify-between gap-3 pt-2">
+            <div className="grid gap-2 pt-3">
+              <CtaLink
+                href={hero.primaryCta.href}
+                label={hero.primaryCta.label}
+                variant="primary"
+                onClick={() => setOpen(false)}
+                className="justify-center py-3 text-sm"
+              />
+              <CtaLink
+                href={hero.secondaryCta.href}
+                label={hero.secondaryCta.label}
+                variant="outlineDark"
+                onClick={() => setOpen(false)}
+                className="justify-center py-3 text-sm"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 pt-3">
               <ThemeToggle />
-              <Link href="/contact" onClick={() => setOpen(false)}>
-                <Button size="sm">Get in touch</Button>
+              <Link
+                href="/search"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200"
+              >
+                <Search size={14} aria-hidden="true" />
+                Search
               </Link>
             </div>
           </div>
